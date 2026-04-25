@@ -62,7 +62,7 @@ export default function NewFamilyPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-stone-700 mb-1">
-                家族说明 <span className="text-red-500">*</span>
+                家族简介 <span className="text-red-500">*</span>
               </label>
               <textarea
                 rows={3}
