@@ -10,6 +10,7 @@ import MemberList from '@/components/member/MemberList'
 import MemberForm from '@/components/member/MemberForm'
 import RelationshipForm from '@/components/relationship/RelationshipForm'
 import Modal from '@/components/ui/Modal'
+import JoinRequestForm from '@/components/family/JoinRequestForm'
 import type { Family, FamilyMember, Relationship } from '@/types'
 
 // FamilyTree uses D3 which is client-only, so we use dynamic import
@@ -30,8 +31,9 @@ export default function FamilyDetailPage() {
   const [view, setView] = useState<View>('tree')
 
   const [modal, setModal] = useState<
-    null | 'addMember' | 'editMember' | 'addRelationship' | 'importConfirm'
+    null | 'addMember' | 'editMember' | 'addRelationship' | 'importConfirm' | 'joinRequest'
   >(null)
+  const [joinApplied, setJoinApplied] = useState(false)
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null)
 
   const isAdmin =
@@ -135,6 +137,17 @@ export default function FamilyDetailPage() {
               </button>
             ))}
           </div>
+
+          {/* Non-admin: apply to join */}
+          {!isAdmin && (
+            <button
+              onClick={() => setModal('joinRequest')}
+              disabled={joinApplied}
+              className="px-3 py-1.5 border border-amber-500 text-amber-700 rounded-lg text-sm hover:bg-amber-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {joinApplied ? '申请审核中' : '申请加入'}
+            </button>
+          )}
 
           {/* Admin actions */}
           {isAdmin && (
@@ -264,6 +277,17 @@ export default function FamilyDetailPage() {
             familyId={familyId}
             members={members}
             onSuccess={() => { setModal(null); load() }}
+            onCancel={() => setModal(null)}
+          />
+        </Modal>
+      )}
+
+      {modal === 'joinRequest' && family && (
+        <Modal title="申请加入家族" onClose={() => setModal(null)}>
+          <JoinRequestForm
+            familyId={familyId}
+            familyName={family.name}
+            onSuccess={() => { setModal(null); setJoinApplied(true) }}
             onCancel={() => setModal(null)}
           />
         </Modal>

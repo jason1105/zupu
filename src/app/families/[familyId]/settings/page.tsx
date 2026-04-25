@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
+import JoinRequestList from '@/components/family/JoinRequestList'
 import type { Family, FamilyAdmin } from '@/types'
 
 export default function FamilySettingsPage() {
@@ -175,6 +176,12 @@ export default function FamilySettingsPage() {
               </button>
             </form>
           )}
+        </div>
+
+        {/* Join requests */}
+        <div className="bg-white border border-stone-200 rounded-xl p-6 mt-4">
+          <h2 className="font-semibold text-stone-700 mb-4">加入申请</h2>
+          <JoinRequestList familyId={familyId} />
         </div>
       </main>
     </>
