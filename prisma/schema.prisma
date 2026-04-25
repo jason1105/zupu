@@ -16,7 +16,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  adminOf FamilyAdmin[]
+  adminOf      FamilyAdmin[]
+  joinRequests FamilyJoinRequest[]
 }
 
 model Family {
@@ -27,8 +28,9 @@ model Family {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  admins  FamilyAdmin[]
-  members FamilyMember[]
+  admins       FamilyAdmin[]
+  members      FamilyMember[]
+  joinRequests FamilyJoinRequest[]
 }
 
 model FamilyAdmin {
@@ -75,4 +77,20 @@ model Relationship {
   toMember   FamilyMember @relation("ToMember", fields: [toMemberId], references: [id], onDelete: Cascade)
 
   @@unique([fromMemberId, toMemberId, type])
+}
+
+model FamilyJoinRequest {
+  id        String   @id @default(cuid())
+  familyId  String
+  userId    String
+  realName  String
+  reason    String
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, userId])
 }

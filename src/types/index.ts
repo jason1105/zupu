@@ -103,3 +103,23 @@ export interface ImportData {
   members: Array<Omit<FamilyMember, 'familyId' | 'createdAt' | 'updatedAt'>>
   relationships: Array<Pick<Relationship, 'fromMemberId' | 'toMemberId' | 'type'>>
 }
+
+export type JoinRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+
+export interface FamilyJoinRequest {
+  id: string
+  familyId: string
+  userId: string
+  realName: string
+  reason: string
+  status: JoinRequestStatus
+  createdAt: string
+  updatedAt: string
+  user?: Pick<User, 'id' | 'email' | 'name'>
+  family?: Pick<Family, 'id' | 'name'>
+}
+
+export interface CreateJoinRequestInput {
+  realName: string
+  reason: string
+}
