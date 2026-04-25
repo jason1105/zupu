@@ -32,6 +32,9 @@ export async function POST(req: NextRequest) {
     if (!name?.trim()) {
       return NextResponse.json({ error: '家族名称为必填项' }, { status: 400 })
     }
+    if (!description?.trim()) {
+      return NextResponse.json({ error: '家族说明为必填项' }, { status: 400 })
+    }
 
     const family = await prisma.family.create({
       data: {
