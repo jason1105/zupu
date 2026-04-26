@@ -96,7 +96,9 @@ export default function DiscoverFamilies({ currentUserId }: Props) {
               {f.description && (
                 <p className="text-stone-500 text-sm line-clamp-2">{f.description}</p>
               )}
-              <p className="text-xs text-stone-400">{f._count.members} 位成员</p>
+              <p className="text-xs text-stone-400">
+                家族有 {f._count.members} 个族谱成员，已有 {f.admins.length} 个用户加入家族
+              </p>
               <button
                 onClick={() => { setApplying(f); setSuccessMsg('') }}
                 disabled={applied.has(f.id)}

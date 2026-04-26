@@ -61,13 +61,16 @@ export default function NewFamilyPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">家族简介</label>
+              <label className="block text-sm font-medium text-stone-700 mb-1">
+                家族简介 <span className="text-red-500">*</span>
+              </label>
               <textarea
                 rows={3}
+                required
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 resize-none"
-                placeholder="可选，简短描述家族来源或特色"
+                placeholder="简短描述家族来源或特色，方便其他人搜索时了解"
               />
             </div>
             <div className="flex gap-3 pt-2">
