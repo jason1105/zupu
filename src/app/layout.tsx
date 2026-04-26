@@ -9,6 +9,13 @@ const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin']
 export const metadata: Metadata = {
   title: '族谱 · Zupu',
   description: '传承家族历史，记录每一位先辈',
+  icons: {
+    icon: [
+      { url: '/favicon.png', sizes: '28x28', type: 'image/png' },
+      { url: '/icon-108.png', sizes: '108x108', type: 'image/png' },
+    ],
+    apple: { url: '/icon-108.png', sizes: '108x108', type: 'image/png' },
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
