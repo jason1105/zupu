@@ -201,7 +201,7 @@ export default function FamilyTree({ members, relationships, onSelectMember }: P
 
   return (
     <div ref={containerRef} className="relative w-full h-full">
-      <svg ref={svgRef} width="100%" height="100%" className="bg-stone-50">
+      <svg ref={svgRef} width="100%" height="100%" className="bg-stone-50" style={{ touchAction: 'none' }}>
         <defs>
           <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
             <path d="M0,0 L0,6 L8,3 z" fill="#a8a29e" />
@@ -260,7 +260,7 @@ export default function FamilyTree({ members, relationships, onSelectMember }: P
       )}
 
       <div className="absolute bottom-4 left-4 text-xs text-stone-400">
-        滚轮缩放 · 拖拽平移 · 点击成员查看详情
+        双指缩放 · 拖拽平移 · 点击成员查看详情
       </div>
     </div>
   )
