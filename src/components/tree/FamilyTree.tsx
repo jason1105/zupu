@@ -99,8 +99,7 @@ function NodeBox({
       y={node.y - NODE_H / 2}
       width={NODE_W}
       height={NODE_H}
-      style={{ overflow: 'visible', cursor: 'pointer' }}
-      onClick={() => onClick(m)}
+      style={{ overflow: 'visible', pointerEvents: 'none' }}
     >
       <div
         style={{
@@ -117,6 +116,7 @@ function NodeBox({
           boxSizing: 'border-box',
           opacity: isDeceased ? 0.75 : 1,
           userSelect: 'none',
+          pointerEvents: 'none',
         }}
       >
         {m.photoUrl && (
@@ -169,24 +169,27 @@ export default function FamilyTree({ members, relationships, onSelectMember }: P
 
     svg.call(zoom)
 
-    // Center the tree
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (rect && nodes.length > 0) {
-      const minX = Math.min(...nodes.map((n) => n.x)) - NODE_W / 2
-      const maxX = Math.max(...nodes.map((n) => n.x)) + NODE_W / 2
-      const minY = Math.min(...nodes.map((n) => n.y)) - NODE_H / 2
-      const maxY = Math.max(...nodes.map((n) => n.y)) + NODE_H / 2
-      const treeW = maxX - minX
-      const treeH = maxY - minY
+    // Center the tree — use rAF so the container is fully laid out (fixes iOS)
+    const raf = requestAnimationFrame(() => {
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (rect && rect.width > 0 && nodes.length > 0) {
+        const minX = Math.min(...nodes.map((n) => n.x)) - NODE_W / 2
+        const maxX = Math.max(...nodes.map((n) => n.x)) + NODE_W / 2
+        const minY = Math.min(...nodes.map((n) => n.y)) - NODE_H / 2
+        const maxY = Math.max(...nodes.map((n) => n.y)) + NODE_H / 2
+        const treeW = maxX - minX
+        const treeH = maxY - minY
 
-      const scale = Math.min(1, rect.width / (treeW + 80), rect.height / (treeH + 80))
-      const tx = (rect.width - treeW * scale) / 2 - minX * scale
-      const ty = (rect.height - treeH * scale) / 2 - minY * scale
+        const scale = Math.min(1, rect.width / (treeW + 80), rect.height / (treeH + 80))
+        const tx = (rect.width - treeW * scale) / 2 - minX * scale
+        const ty = (rect.height - treeH * scale) / 2 - minY * scale
 
-      svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale))
-    }
+        svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale))
+      }
+    })
 
     return () => {
+      cancelAnimationFrame(raf)
       svg.on('.zoom', null)
     }
   }, [nodes.length])
@@ -224,6 +227,19 @@ export default function FamilyTree({ members, relationships, onSelectMember }: P
           {/* Nodes */}
           {nodes.map((node) => (
             <NodeBox key={node.id} node={node} onClick={handleSelect} />
+          ))}
+          {/* Transparent hit areas for click — foreignObject has pointerEvents:none on iOS */}
+          {nodes.map((node) => (
+            <rect
+              key={`hit-${node.id}`}
+              x={node.x - NODE_W / 2}
+              y={node.y - NODE_H / 2}
+              width={NODE_W}
+              height={NODE_H}
+              fill="transparent"
+              style={{ cursor: 'pointer' }}
+              onClick={() => handleSelect(node.member)}
+            />
           ))}
         </g>
       </svg>
