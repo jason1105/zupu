@@ -167,37 +167,29 @@ export default function FamilyTree({ members, relationships, onSelectMember }: P
         svg.select('g.canvas').attr('transform', event.transform)
       })
 
-    // Non-passive touch listeners prevent iOS from claiming the gesture for text-selection loupe
-    const node = svgRef.current
-    const swallow = (e: TouchEvent) => { if (e.cancelable) e.preventDefault() }
-    node.addEventListener('touchstart', swallow, { passive: false })
-    node.addEventListener('touchmove', swallow, { passive: false })
-
     svg.call(zoom)
 
-    // Center the tree — use rAF so the container is fully laid out (fixes iOS)
-    const raf = requestAnimationFrame(() => {
+    const centerTree = () => {
       const rect = containerRef.current?.getBoundingClientRect()
-      if (rect && rect.width > 0 && nodes.length > 0) {
-        const minX = Math.min(...nodes.map((n) => n.x)) - NODE_W / 2
-        const maxX = Math.max(...nodes.map((n) => n.x)) + NODE_W / 2
-        const minY = Math.min(...nodes.map((n) => n.y)) - NODE_H / 2
-        const maxY = Math.max(...nodes.map((n) => n.y)) + NODE_H / 2
-        const treeW = maxX - minX
-        const treeH = maxY - minY
+      if (!rect || rect.width === 0 || nodes.length === 0) return
+      const minX = Math.min(...nodes.map((n) => n.x)) - NODE_W / 2
+      const maxX = Math.max(...nodes.map((n) => n.x)) + NODE_W / 2
+      const minY = Math.min(...nodes.map((n) => n.y)) - NODE_H / 2
+      const maxY = Math.max(...nodes.map((n) => n.y)) + NODE_H / 2
+      const treeW = maxX - minX
+      const treeH = maxY - minY
+      const scale = Math.min(1, rect.width / (treeW + 80), rect.height / (treeH + 80))
+      const tx = (rect.width - treeW * scale) / 2 - minX * scale
+      const ty = (rect.height - treeH * scale) / 2 - minY * scale
+      svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale))
+    }
 
-        const scale = Math.min(1, rect.width / (treeW + 80), rect.height / (treeH + 80))
-        const tx = (rect.width - treeW * scale) / 2 - minX * scale
-        const ty = (rect.height - treeH * scale) / 2 - minY * scale
-
-        svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale))
-      }
-    })
+    // ResizeObserver fires once the container has real dimensions (reliable on iOS)
+    const ro = new ResizeObserver(centerTree)
+    if (containerRef.current) ro.observe(containerRef.current)
 
     return () => {
-      cancelAnimationFrame(raf)
-      node.removeEventListener('touchstart', swallow)
-      node.removeEventListener('touchmove', swallow)
+      ro.disconnect()
       svg.on('.zoom', null)
     }
   }, [nodes.length])
@@ -211,8 +203,8 @@ export default function FamilyTree({ members, relationships, onSelectMember }: P
   }
 
   return (
-    <div ref={containerRef} className="relative w-full h-full">
-      <svg ref={svgRef} width="100%" height="100%" className="bg-stone-50 tree-svg" style={{ touchAction: 'none' }}>
+    <div ref={containerRef} className="relative w-full h-full" style={{ touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}>
+      <svg ref={svgRef} width="100%" height="100%" className="bg-stone-50" style={{ touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}>
         <defs>
           <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
             <path d="M0,0 L0,6 L8,3 z" fill="#a8a29e" />
