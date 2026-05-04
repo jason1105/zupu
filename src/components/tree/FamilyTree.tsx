@@ -167,6 +167,12 @@ export default function FamilyTree({ members, relationships, onSelectMember }: P
         svg.select('g.canvas').attr('transform', event.transform)
       })
 
+    // Non-passive touch listeners prevent iOS from claiming the gesture for text-selection loupe
+    const node = svgRef.current
+    const swallow = (e: TouchEvent) => { if (e.cancelable) e.preventDefault() }
+    node.addEventListener('touchstart', swallow, { passive: false })
+    node.addEventListener('touchmove', swallow, { passive: false })
+
     svg.call(zoom)
 
     // Center the tree — use rAF so the container is fully laid out (fixes iOS)
@@ -190,6 +196,8 @@ export default function FamilyTree({ members, relationships, onSelectMember }: P
 
     return () => {
       cancelAnimationFrame(raf)
+      node.removeEventListener('touchstart', swallow)
+      node.removeEventListener('touchmove', swallow)
       svg.on('.zoom', null)
     }
   }, [nodes.length])
@@ -204,7 +212,7 @@ export default function FamilyTree({ members, relationships, onSelectMember }: P
 
   return (
     <div ref={containerRef} className="relative w-full h-full">
-      <svg ref={svgRef} width="100%" height="100%" className="bg-stone-50" style={{ touchAction: 'none' }}>
+      <svg ref={svgRef} width="100%" height="100%" className="bg-stone-50 tree-svg" style={{ touchAction: 'none' }}>
         <defs>
           <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
             <path d="M0,0 L0,6 L8,3 z" fill="#a8a29e" />
@@ -237,7 +245,7 @@ export default function FamilyTree({ members, relationships, onSelectMember }: P
               width={NODE_W}
               height={NODE_H}
               fill="transparent"
-              style={{ cursor: 'pointer' }}
+              style={{ cursor: 'pointer', pointerEvents: 'all' }}
               onClick={() => handleSelect(node.member)}
             />
           ))}
