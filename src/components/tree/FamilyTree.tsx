@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import * as d3 from 'd3'
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import type { FamilyMember, Relationship, TreeNode } from '@/types'
-import { buildTree, flattenTree } from '@/lib/tree-utils'
+import { buildTree } from '@/lib/tree-utils'
 
 interface Props {
   members: FamilyMember[]
@@ -11,12 +12,12 @@ interface Props {
   onSelectMember?: (member: FamilyMember) => void
 }
 
-// Layout constants
 const NODE_W = 140
 const NODE_H = 70
 const H_GAP = 180
 const V_GAP = 120
 const SPOUSE_OFFSET = 160
+const PADDING = 40
 
 interface LayoutNode {
   id: string
@@ -33,8 +34,6 @@ interface LayoutEdge {
 function computeLayout(roots: TreeNode[]): { nodes: LayoutNode[]; edges: LayoutEdge[] } {
   const nodes: LayoutNode[] = []
   const edges: LayoutEdge[] = []
-
-  // Use D3 hierarchy for each root, then offset horizontally
   let xOffset = 0
 
   for (const root of roots) {
@@ -50,7 +49,6 @@ function computeLayout(roots: TreeNode[]): { nodes: LayoutNode[]; edges: LayoutE
       const y = (n.y ?? 0)
       nodes.push({ id: n.data.id, member: n.data.member, x, y, spouses: n.data.spouses })
 
-      // Parent → Child edges
       if (n.parent) {
         edges.push({
           x1: (n.parent.x ?? 0) - minX + xOffset,
@@ -66,11 +64,9 @@ function computeLayout(roots: TreeNode[]): { nodes: LayoutNode[]; edges: LayoutE
     xOffset = maxX + H_GAP * 2
   }
 
-  // Spouse edges: connect main node to each spouse node (lateral)
   nodes.forEach((node) => {
     node.spouses.forEach((spouse, idx) => {
       const spouseX = node.x + SPOUSE_OFFSET * (idx + 1)
-      // Add spouse as a visual node
       nodes.push({ id: `spouse-${node.id}-${spouse.id}`, member: spouse, x: spouseX, y: node.y, spouses: [] })
       edges.push({ x1: node.x + NODE_W / 2, y1: node.y, x2: spouseX - NODE_W / 2, y2: node.y, type: 'spouse' })
     })
@@ -79,13 +75,7 @@ function computeLayout(roots: TreeNode[]): { nodes: LayoutNode[]; edges: LayoutE
   return { nodes, edges }
 }
 
-function NodeBox({
-  node,
-  onClick,
-}: {
-  node: LayoutNode
-  onClick: (m: FamilyMember) => void
-}) {
+function NodeBox({ node }: { node: LayoutNode }) {
   const m = node.member
   const isDeceased = !m.isAlive
   const genderColor =
@@ -99,8 +89,7 @@ function NodeBox({
       y={node.y - NODE_H / 2}
       width={NODE_W}
       height={NODE_H}
-      style={{ overflow: 'visible', cursor: 'pointer' }}
-      onClick={() => onClick(m)}
+      style={{ overflow: 'visible', pointerEvents: 'none' }}
     >
       <div
         style={{
@@ -117,6 +106,7 @@ function NodeBox({
           boxSizing: 'border-box',
           opacity: isDeceased ? 0.75 : 1,
           userSelect: 'none',
+          pointerEvents: 'none',
         }}
       >
         {m.photoUrl && (
@@ -140,9 +130,7 @@ function NodeBox({
 }
 
 export default function FamilyTree({ members, relationships, onSelectMember }: Props) {
-  const svgRef = useRef<SVGSVGElement>(null)
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
 
   const roots = buildTree(members, relationships)
   const { nodes, edges } = computeLayout(roots)
@@ -155,42 +143,6 @@ export default function FamilyTree({ members, relationships, onSelectMember }: P
     [onSelectMember]
   )
 
-  useEffect(() => {
-    if (!svgRef.current) return
-
-    const svg = d3.select(svgRef.current)
-
-    const zoom = d3
-      .zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.1, 3])
-      .on('zoom', (event) => {
-        svg.select('g.canvas').attr('transform', event.transform)
-      })
-
-    svg.call(zoom)
-
-    // Center the tree
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (rect && nodes.length > 0) {
-      const minX = Math.min(...nodes.map((n) => n.x)) - NODE_W / 2
-      const maxX = Math.max(...nodes.map((n) => n.x)) + NODE_W / 2
-      const minY = Math.min(...nodes.map((n) => n.y)) - NODE_H / 2
-      const maxY = Math.max(...nodes.map((n) => n.y)) + NODE_H / 2
-      const treeW = maxX - minX
-      const treeH = maxY - minY
-
-      const scale = Math.min(1, rect.width / (treeW + 80), rect.height / (treeH + 80))
-      const tx = (rect.width - treeW * scale) / 2 - minX * scale
-      const ty = (rect.height - treeH * scale) / 2 - minY * scale
-
-      svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale))
-    }
-
-    return () => {
-      svg.on('.zoom', null)
-    }
-  }, [nodes.length])
-
   if (members.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-stone-400 text-sm">
@@ -199,38 +151,74 @@ export default function FamilyTree({ members, relationships, onSelectMember }: P
     )
   }
 
-  return (
-    <div ref={containerRef} className="relative w-full h-full">
-      <svg ref={svgRef} width="100%" height="100%" className="bg-stone-50">
-        <defs>
-          <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-            <path d="M0,0 L0,6 L8,3 z" fill="#a8a29e" />
-          </marker>
-        </defs>
-        <g className="canvas">
-          {/* Edges */}
-          {edges.map((e, i) => (
-            <line
-              key={i}
-              x1={e.x1}
-              y1={e.y1}
-              x2={e.x2}
-              y2={e.y2}
-              stroke={e.type === 'spouse' ? '#d6d3d1' : '#a8a29e'}
-              strokeWidth={e.type === 'spouse' ? 1.5 : 1.5}
-              strokeDasharray={e.type === 'spouse' ? '5,4' : undefined}
-            />
-          ))}
-          {/* Nodes */}
-          {nodes.map((node) => (
-            <NodeBox key={node.id} node={node} onClick={handleSelect} />
-          ))}
-        </g>
-      </svg>
+  // Bounding box of the tree content
+  const minX = Math.min(...nodes.map((n) => n.x)) - NODE_W / 2 - PADDING
+  const maxX = Math.max(...nodes.map((n) => n.x)) + NODE_W / 2 + PADDING
+  const minY = Math.min(...nodes.map((n) => n.y)) - NODE_H / 2 - PADDING
+  const maxY = Math.max(...nodes.map((n) => n.y)) + NODE_H / 2 + PADDING
+  const svgW = maxX - minX
+  const svgH = maxY - minY
 
-      {/* Selected member detail panel */}
+  return (
+    <div className="relative w-full h-full overflow-hidden bg-stone-50" style={{ touchAction: 'none' }}>
+      <TransformWrapper
+        minScale={0.1}
+        maxScale={3}
+        initialScale={1}
+        centerOnInit={true}
+        limitToBounds={false}
+        wheel={{ step: 0.1 }}
+        doubleClick={{ disabled: true }}
+        panning={{ velocityDisabled: true }}
+      >
+        <TransformComponent
+          wrapperStyle={{ width: '100%', height: '100%' }}
+          contentStyle={{ width: svgW, height: svgH }}
+        >
+          <svg
+            width={svgW}
+            height={svgH}
+            viewBox={`${minX} ${minY} ${svgW} ${svgH}`}
+            style={{ display: 'block' }}
+          >
+            <defs>
+              <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L8,3 z" fill="#a8a29e" />
+              </marker>
+            </defs>
+            {edges.map((e, i) => (
+              <line
+                key={i}
+                x1={e.x1}
+                y1={e.y1}
+                x2={e.x2}
+                y2={e.y2}
+                stroke={e.type === 'spouse' ? '#d6d3d1' : '#a8a29e'}
+                strokeWidth={1.5}
+                strokeDasharray={e.type === 'spouse' ? '5,4' : undefined}
+              />
+            ))}
+            {nodes.map((node) => (
+              <NodeBox key={node.id} node={node} />
+            ))}
+            {nodes.map((node) => (
+              <rect
+                key={`hit-${node.id}`}
+                x={node.x - NODE_W / 2}
+                y={node.y - NODE_H / 2}
+                width={NODE_W}
+                height={NODE_H}
+                fill="transparent"
+                style={{ cursor: 'pointer' }}
+                onClick={() => handleSelect(node.member)}
+              />
+            ))}
+          </svg>
+        </TransformComponent>
+      </TransformWrapper>
+
       {selectedMember && (
-        <div className="absolute bottom-4 right-4 bg-white border border-stone-200 rounded-xl shadow-lg p-4 w-56 text-sm">
+        <div className="absolute bottom-4 right-4 bg-white border border-stone-200 rounded-xl shadow-lg p-4 w-56 text-sm z-10">
           <button
             onClick={() => setSelectedMember(null)}
             className="absolute top-2 right-2 text-stone-400 hover:text-stone-700 text-lg leading-none"
@@ -259,8 +247,8 @@ export default function FamilyTree({ members, relationships, onSelectMember }: P
         </div>
       )}
 
-      <div className="absolute bottom-4 left-4 text-xs text-stone-400">
-        滚轮缩放 · 拖拽平移 · 点击成员查看详情
+      <div className="absolute bottom-4 left-4 text-xs text-stone-400 pointer-events-none">
+        双指缩放 · 拖拽平移 · 点击成员查看详情
       </div>
     </div>
   )
