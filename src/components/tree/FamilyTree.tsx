@@ -156,41 +156,118 @@ export default function FamilyTree({ members, relationships, onSelectMember }: P
   )
 
   useEffect(() => {
-    if (!svgRef.current) return
+    const svgEl = svgRef.current
+    if (!svgEl) return
 
-    const svg = d3.select(svgRef.current)
+    const svg = d3.select(svgEl)
+    const canvas = svgEl.querySelector('g.canvas') as SVGGElement | null
+    if (!canvas) return
 
+    // Current transform state (shared between D3 and touch handlers)
+    let xform = d3.zoomIdentity
+
+    const applyTransform = (t: d3.ZoomTransform) => {
+      xform = t
+      canvas.setAttribute('transform', `translate(${t.x},${t.y}) scale(${t.k})`)
+    }
+
+    // D3 zoom for desktop (mouse wheel + drag) — touch events filtered out
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 3])
-      .on('zoom', (event) => {
-        svg.select('g.canvas').attr('transform', event.transform)
-      })
+      .filter((e) => !e.type.startsWith('touch'))
+      .on('zoom', (event) => applyTransform(event.transform))
 
     svg.call(zoom)
 
+    // Initial centering via ResizeObserver
+    let centered = false
     const centerTree = () => {
+      if (centered) return
       const rect = containerRef.current?.getBoundingClientRect()
       if (!rect || rect.width === 0 || nodes.length === 0) return
+      centered = true
       const minX = Math.min(...nodes.map((n) => n.x)) - NODE_W / 2
       const maxX = Math.max(...nodes.map((n) => n.x)) + NODE_W / 2
       const minY = Math.min(...nodes.map((n) => n.y)) - NODE_H / 2
       const maxY = Math.max(...nodes.map((n) => n.y)) + NODE_H / 2
       const treeW = maxX - minX
       const treeH = maxY - minY
-      const scale = Math.min(1, rect.width / (treeW + 80), rect.height / (treeH + 80))
-      const tx = (rect.width - treeW * scale) / 2 - minX * scale
-      const ty = (rect.height - treeH * scale) / 2 - minY * scale
-      svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale))
+      const k = Math.min(1, rect.width / (treeW + 80), rect.height / (treeH + 80))
+      const tx = (rect.width - treeW * k) / 2 - minX * k
+      const ty = (rect.height - treeH * k) / 2 - minY * k
+      const t = d3.zoomIdentity.translate(tx, ty).scale(k)
+      applyTransform(t)
+      svg.call(zoom.transform, t) // sync D3 internal state for wheel zoom
     }
 
-    // ResizeObserver fires once the container has real dimensions (reliable on iOS)
     const ro = new ResizeObserver(centerTree)
     if (containerRef.current) ro.observe(containerRef.current)
+
+    // Manual touch handling for iOS — bypasses D3 zoom entirely for touch
+    const touch = { x: 0, y: 0, dist: 0 }
+
+    const onTouchStart = (e: TouchEvent) => {
+      e.preventDefault()
+      if (e.touches.length === 1) {
+        touch.x = e.touches[0].clientX
+        touch.y = e.touches[0].clientY
+      } else if (e.touches.length === 2) {
+        touch.x = (e.touches[0].clientX + e.touches[1].clientX) / 2
+        touch.y = (e.touches[0].clientY + e.touches[1].clientY) / 2
+        touch.dist = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY
+        )
+      }
+    }
+
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault()
+      if (e.touches.length === 1) {
+        const dx = e.touches[0].clientX - touch.x
+        const dy = e.touches[0].clientY - touch.y
+        touch.x = e.touches[0].clientX
+        touch.y = e.touches[0].clientY
+        const t = d3.zoomIdentity.translate(xform.x + dx, xform.y + dy).scale(xform.k)
+        applyTransform(t)
+      } else if (e.touches.length === 2) {
+        const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2
+        const my = (e.touches[0].clientY + e.touches[1].clientY) / 2
+        const dist = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY
+        )
+        const ratio = dist / touch.dist
+        const svgRect = svgEl.getBoundingClientRect()
+        const lx = mx - svgRect.left   // local coords within SVG
+        const ly = my - svgRect.top
+        const newK = Math.min(3, Math.max(0.1, xform.k * ratio))
+        const newTx = lx - newK * ((lx - xform.x) / xform.k)
+        const newTy = ly - newK * ((ly - xform.y) / xform.k)
+        touch.x = mx
+        touch.y = my
+        touch.dist = dist
+        const t = d3.zoomIdentity.translate(newTx, newTy).scale(newK)
+        applyTransform(t)
+      }
+    }
+
+    const onTouchEnd = () => {
+      // Sync D3's internal zoom state so subsequent wheel zoom works correctly
+      svg.call(zoom.transform, xform)
+    }
+
+    svgEl.addEventListener('touchstart', onTouchStart, { passive: false })
+    svgEl.addEventListener('touchmove', onTouchMove, { passive: false })
+    svgEl.addEventListener('touchend', onTouchEnd, { passive: false })
 
     return () => {
       ro.disconnect()
       svg.on('.zoom', null)
+      svgEl.removeEventListener('touchstart', onTouchStart)
+      svgEl.removeEventListener('touchmove', onTouchMove)
+      svgEl.removeEventListener('touchend', onTouchEnd)
     }
   }, [nodes.length])
 
