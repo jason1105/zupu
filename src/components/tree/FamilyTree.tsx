@@ -141,6 +141,7 @@ function NodeBox({
 
 export default function FamilyTree({ members, relationships, onSelectMember }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
+  const canvasRef = useRef<SVGGElement>(null)
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -157,18 +158,21 @@ export default function FamilyTree({ members, relationships, onSelectMember }: P
 
   useEffect(() => {
     const svgEl = svgRef.current
-    if (!svgEl) return
+    const canvas = canvasRef.current
+    if (!svgEl || !canvas) return
 
     const svg = d3.select(svgEl)
-    const canvas = svgEl.querySelector('g.canvas') as SVGGElement | null
-    if (!canvas) return
+
+    // Use CSS transform for hardware-accelerated rendering on iOS
+    canvas.style.transformOrigin = '0 0'
+    canvas.style.willChange = 'transform'
 
     // Current transform state (shared between D3 and touch handlers)
     let xform = d3.zoomIdentity
 
     const applyTransform = (t: d3.ZoomTransform) => {
       xform = t
-      canvas.setAttribute('transform', `translate(${t.x},${t.y}) scale(${t.k})`)
+      canvas.style.transform = `translate(${t.x}px,${t.y}px) scale(${t.k})`
     }
 
     // D3 zoom for desktop (mouse wheel + drag) — touch events filtered out
@@ -287,7 +291,7 @@ export default function FamilyTree({ members, relationships, onSelectMember }: P
             <path d="M0,0 L0,6 L8,3 z" fill="#a8a29e" />
           </marker>
         </defs>
-        <g className="canvas">
+        <g ref={canvasRef}>
           {/* Edges */}
           {edges.map((e, i) => (
             <line
